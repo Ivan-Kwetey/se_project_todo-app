@@ -1,67 +1,84 @@
-import { v4 as uuidv4 } from "https://jspm.dev/uuid";
 import { initialTodos, validationConfig } from "../utils/constants.js";
 import Todo from "../components/Todo.js";
+import { v4 as uuidv4 } from "https://jspm.dev/uuid";
 import FormValidator from "../components/FormValidator.js";
+import Section from "../components/Section.js";
+import Popup from "../components/Popup.js";
+import PopupWithForm from "../components/PopupWithForm.js";
+import TodoCounter from "../components/TodoCounter.js";
 
-// DOM Elements
 const addTodoButton = document.querySelector(".button_action_add");
-const addTodoPopup = document.querySelector("#add-todo-popup");
-const addTodoForm = document.forms["add-todo-form"];
-const addTodoCloseBtn = document.querySelector(".popup__close");
+const addTodoPopupEl = document.querySelector("#add-todo-popup");
+const addTodoForm = addTodoPopupEl.querySelector(".popup__form");
+const addTodoCloseBtn = addTodoPopupEl.querySelector(".popup__close");
 const todosList = document.querySelector(".todos__list");
 
-// Modal Handlers
-const openModal = (modal) => {
-  modal.classList.add("popup_visible");
-};
+const todoCounter = new TodoCounter(initialTodos, ".counter_text");
 
-const closeModal = (modal) => {
-  modal.classList.remove("popup_visible");
-};
+function handleCheck(completed) {
+  todoCounter.updateCompleted(completed);
+}
 
-// Generate Todo Element using the Todo class
+function handleDelete(completed) {
+  todoCounter.updateTotal(false);
+  if (completed) {
+    todoCounter.updateCompleted(false);
+  }
+}
+
+function handleAddTodo() {
+  todoCounter.updateTotal(true);
+}
+
+const addTodoPopup = new PopupWithForm({
+  popupSelector: "#add-todo-popup",
+  handleFormSubmit: (inputValues) => {
+    const name = inputValues.name;
+    const dateInput = inputValues.date;
+
+    const date = new Date(dateInput);
+    date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
+
+    const id = uuidv4();
+    const values = { name, date, id };
+    const todo = generateTodo(values);
+    section.addItem(todo);
+    handleAddTodo();
+
+    newTodoValidator.resetValidation();
+
+    addTodoPopup.close();
+  },
+});
+
+const section = new Section({
+  items: initialTodos,
+  renderer: (item) => {
+    const renderTodo = generateTodo(item);
+    section.addItem(renderTodo);
+  },
+  containerSelector: ".todos__list",
+});
+
 const generateTodo = (data) => {
-  const todo = new Todo(data, "#todo-template");
-  return todo.getView();
+  const todo = new Todo(
+    data,
+    "#todo-template",
+    handleCheck,
+    handleDelete,
+    handleAddTodo
+  );
+  const todoElement = todo.getView();
+  return todoElement;
 };
 
-const renderTodo = (item) => {
-  const todoElement = generateTodo(item);
-  todosList.append(todoElement);
-};
-
-// Event Listeners
 addTodoButton.addEventListener("click", () => {
-  openModal(addTodoPopup);
+  addTodoPopup.open();
 });
 
-addTodoCloseBtn.addEventListener("click", () => {
-  closeModal(addTodoPopup);
-});
+addTodoPopup.setEventListeners();
 
+const newTodoValidator = new FormValidator(validationConfig, addTodoForm);
+newTodoValidator.enableValidation();
 
-addTodoForm.addEventListener("submit", (evt) => {
-  evt.preventDefault();
-
-  const name = evt.target.name.value.trim();
-  const dateInput = evt.target.date.value;
-
-  if (!name) return;
-
-  const date = dateInput
-    ? new Date(new Date(dateInput).getTime() + new Date().getTimezoneOffset() * 60000)
-    : null;
-
-  const id = uuidv4();
-  const values = { name, date, id };
-
-  renderTodo(values);              
-  formValidator.resetValidation(); 
-  closeModal(addTodoPopup);
-});
-
-initialTodos.forEach(renderTodo); 
-
-// Enable form validation
-const formValidator = new FormValidator(validationConfig, addTodoForm);
-formValidator.enableValidation();
+section.renderItems();
